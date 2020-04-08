@@ -5,18 +5,25 @@ byte orientation = 0;//travels around from
 enum signals {INERT, HEAL, DAMAGE, RESET, RESOLVE};
 byte faceSignal[6] = {INERT, INERT, INERT, INERT, INERT, INERT};
 
-enum healthStates {DAMAGED, HEALTHY, HEALING};
+enum healthStates {DAMAGED, HEALTHY, HEALING, TRANSFERRING};
 byte health[5] = {HEALTHY, HEALTHY, HEALTHY, HEALTHY, HEALTHY};
 byte healthTotal = 5;
 Timer healingTimer;
 #define HEAL_TIME 1000
 
 Timer laserTimer;//used when a laser blast has been recieved
+#define LASER_BLAST_DURATION 2000//how long the big beam stays fully lit
+#define LASER_FADE 500
+#define EXPLOSION_DURATION 1500
+#define WORLD_FADE_IN 1000
+
+#define LASER_FULL_DURATION 5000
 bool laserFaces[6] = {false, false, false, false, false, false};
 
 // SYNCHRONIZED WAVES
 Timer syncTimer;
-#define PERIOD_DURATION 4000
+#define PERIOD_DURATION 6000
+#define PERIOD_DURATION_ALT 4000
 #define BUFFER_DURATION 400
 byte neighborState[6];
 byte syncVal = 0;
@@ -51,6 +58,8 @@ void loop() {
         faceSignal[(orientation + 4) % 6] = DAMAGE;
         //UPDATE ORIENTATION
         orientation = (orientation + 1) % 6;
+        //TRIGGER ANIMATION
+        laserTimer.set(LASER_FULL_DURATION);
         break;
       case SHIP:
         //SEND HEALING PULSE!
@@ -112,6 +121,8 @@ void inertLoop(byte face) {
       case DAMAGE:
         passDamage(face);
         takeDamage();
+        //trigger animation
+        laserTimer.set(LASER_FULL_DURATION);
         break;
       case HEAL:
         faceSignal[face] = HEAL;
@@ -200,7 +211,13 @@ void resolveLoop(byte face) {
 }
 
 void passDamage(byte face) {
-  if (blinkMode == MIRROR) {
+  //reset laser faces
+  FOREACH_FACE(f) {
+    laserFaces[f] = false;
+  }
+
+  //now actually do the pass
+  if (blinkMode == MIRROR) {//I'm a mirror
 
     byte otherFace = (orientation + 2) % 6;//this is the other face that can redirect
     if (face == orientation || face == otherFace) {//am I being damaged on that face?
@@ -215,7 +232,7 @@ void passDamage(byte face) {
       laserFaces[face] = true;
       laserFaces[(face + 3) % 6] = true;
     }
-  } else {
+  } else {//just a regular ship piece or actual laser piece
     faceSignal[face] = DAMAGE;
     faceSignal[(face + 3) % 6] = DAMAGE;
 
@@ -337,7 +354,12 @@ void syncLoop() {
        || syncTimer.isExpired()
      ) {
 
-    syncTimer.set(PERIOD_DURATION); // aim to pass go in the defined duration
+    if (random(20) == 0) {
+      syncTimer.set(PERIOD_DURATION_ALT); // aim to pass go in the defined duration
+    } else {
+      syncTimer.set(PERIOD_DURATION); // aim to pass go in the defined duration
+
+    }
     syncVal = !syncVal; // change our value everytime we pass go
   }
 }
@@ -356,21 +378,68 @@ void waterDisplay() { //just displays the water beneath any piece with missing b
   setColor(makeColorHSB(WATER_HUE, 255, syncProgressMapped));
 }
 
+#define EXPLOSION_DELAY 200
+#define HUE_BEGIN 25
+byte phaseOffset[6] = {0, (EXPLOSION_DELAY / 5) * 2, (EXPLOSION_DELAY / 5) * 5, (EXPLOSION_DELAY / 5) * 3, (EXPLOSION_DELAY / 5) * 1, (EXPLOSION_DELAY / 5) * 4};
+
 void shipDisplay() {
-  //just light up the ship in the healthy spots, plus the healing port
-
-  for (byte i = 0; i < 5; i++) {
-    if (health[i] == HEALTHY) {
-      setColorOnFace(YELLOW, i);
+  if (laserTimer.isExpired()) {//normal display
+    for (byte i = 0; i < 5; i++) {
+      if (health[i] == HEALTHY) {
+        setColorOnFace(YELLOW, i);
+      }
     }
-  }
 
-  if (healthTotal > 0) {
-    setColorOnFace(GREEN, 5);
+    if (healthTotal > 0) {
+      setColorOnFace(GREEN, 5);
+    }
+  } else {//laser display
+    if (LASER_FULL_DURATION - laserTimer.getRemaining() < LASER_BLAST_DURATION) {
+
+      //initial laser blast
+      setColor(RED);
+
+    } else if (LASER_FULL_DURATION - laserTimer.getRemaining() > LASER_BLAST_DURATION && LASER_FULL_DURATION - laserTimer.getRemaining() < LASER_BLAST_DURATION + LASER_FADE) {
+
+      //laser fade down
+      byte laserBrightness = 255 - map(LASER_FULL_DURATION - laserTimer.getRemaining() - LASER_BLAST_DURATION, 0, LASER_FADE, 0, 255);
+      setColor(makeColorHSB(0, 255, laserBrightness));
+
+    } else if (laserTimer.getRemaining() < EXPLOSION_DURATION + WORLD_FADE_IN && laserTimer.getRemaining() > WORLD_FADE_IN) {
+
+      //explosion time!
+      byte currentHue = map(laserTimer.getRemaining(), WORLD_FADE_IN, EXPLOSION_DURATION + WORLD_FADE_IN, 0, HUE_BEGIN);
+      FOREACH_FACE(f) {//do explosions on each face with phase offsets
+        if (laserTimer.getRemaining() < EXPLOSION_DURATION + WORLD_FADE_IN - phaseOffset[f]) { //should this face be exploding?
+          byte progress = map(laserTimer.getRemaining(), WORLD_FADE_IN, EXPLOSION_DURATION + WORLD_FADE_IN - phaseOffset[f], 0, 255); //255-0 as the explosion carries on
+          setColorOnFace(makeColorHSB(currentHue, 255 - progress, progress), f);
+        }
+      }
+    } else { //world fade up
+      byte fadeupBrightness = 255 - map(laserTimer.getRemaining(), 0, WORLD_FADE_IN, 0, 255);
+      for (byte i = 0; i < 5; i++) {
+        if (health[i] == HEALTHY) {
+          setColorOnFace(dim(YELLOW, fadeupBrightness), i);
+        }
+      }
+
+      if (healthTotal > 0) {
+        setColorOnFace(dim(GREEN, fadeupBrightness), 5);
+      }
+    }
   }
 }
 
 void laserDisplay() {
+
+  if (!laserTimer.isExpired() && LASER_FULL_DURATION - laserTimer.getRemaining() < LASER_BLAST_DURATION) {//brighten the non-active faces while the laser is going strong
+    setColor(RED);
+  } else if (!laserTimer.isExpired() && LASER_FULL_DURATION - laserTimer.getRemaining() > LASER_BLAST_DURATION && LASER_FULL_DURATION - laserTimer.getRemaining() < LASER_BLAST_DURATION + LASER_FADE) {
+    //we are in that little laser fading time, so we should do the same
+    byte laserBrightness = 255 - map(LASER_FULL_DURATION - laserTimer.getRemaining() - LASER_BLAST_DURATION, 0, LASER_FADE, 0, 255);
+    setColor(makeColorHSB(0, 255, laserBrightness));
+  }
+
   setColorOnFace(RED, orientation);
   setColorOnFace(RED, (orientation + 2) % 6);
   setColorOnFace(RED, (orientation + 4) % 6);
