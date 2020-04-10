@@ -95,6 +95,19 @@ void loop() {
     }
   }
 
+  //resolve healing
+  for (byte i = 0; i < 5; i++) {
+    if (health[i] == HEALING) {
+      if (healingTimer.isExpired()) {
+        health[i] = HEALTHY;
+      }
+    } else if (health[i] == TRANSFERRING) {
+      if (healingTimer.isExpired()) {
+        health[i] = DAMAGED;
+      }
+    }
+  }
+
   //do communication
   FOREACH_FACE(f) {
     byte sendData = (blinkMode << 4) + (faceSignal[f] << 1) + (syncVal);
@@ -248,6 +261,7 @@ void passDamage(byte face) {
 void takeDamage() {
 
   //update health total
+  healingTimer.set(HEAL_TIME);
   updateHealthTotal();
 
   //if we're even alive, choose a random segment to damage
@@ -257,10 +271,10 @@ void takeDamage() {
 
     //run through healthy segments, damage one when countdown becomes 0
     for (byte j = 0; j < 5; j++) {
-      if (health[j] != DAMAGED) {//this bit is alive
+      if (health[j] == HEALTHY || health[j] == HEALING) {//this bit is alive
         countdown--;//decrement the countdown
         if (countdown == 0) {//this the one we're gonna damage - let it rip
-          health[j] = DAMAGED;
+          health[j] = TRANSFERRING;//this will allow healing graphics to work, and will not change laser graphics
           healthTotal--;
           countdown = 255;//just a giant number, allows the loop to run through
         }
@@ -271,7 +285,9 @@ void takeDamage() {
 }
 
 void getHealed() {
-
+  
+  healingTimer.set(HEAL_TIME);
+  
   //update health total
   updateHealthTotal();
 
@@ -296,17 +312,19 @@ void getHealed() {
 }
 
 void fullHeal() {
+
+  healingTimer.set(HEAL_TIME);
   //reset health on this blink
   healthTotal = 5;
   for (byte i = 0; i < 5; i++) {
-    health[i] = HEALTHY;
+    health[i] = HEALING;
   }
 }
 
 void updateHealthTotal() {
   healthTotal = 0;
   for (byte i = 0; i < 5; i++) {
-    if (health[i] == HEALTHY) {
+    if (health[i] == HEALTHY || health[i] == HEALING) {
       healthTotal++;
     }
   }
@@ -387,6 +405,12 @@ void shipDisplay() {
     for (byte i = 0; i < 5; i++) {
       if (health[i] == HEALTHY) {
         setColorOnFace(YELLOW, i);
+      } else if (health[i] == HEALING) {
+        byte healingBrightness = 255 - map(healingTimer.getRemaining(), 0, HEAL_TIME, 0, 255);
+        setColorOnFace(dim(WHITE, healingBrightness), i);
+      } else if (health[i] == TRANSFERRING) {
+        byte transferBrightness = map(healingTimer.getRemaining(), 0, HEAL_TIME, 0, 255);
+        setColorOnFace(dim(WHITE, transferBrightness), i);
       }
     }
 
