@@ -12,16 +12,20 @@ Timer healingTimer;
 #define HEAL_TIME 1000
 
 Timer laserTimer;//used when a laser blast has been recieved
-#define LASER_BLAST_DURATION 1500//how long the big beam stays fully lit
-#define LASER_FADE 250
-#define EXPLOSION_DURATION 2000
+#define LASER_BLAST_DURATION 750//how long the big beam stays fully lit
+#define LASER_FADE 0
+#define EXPLOSION_DURATION 1600
 #define WORLD_FADE_IN 1000
+
+Timer attackAniTimer;
+byte segment = 0;
+byte entryFace;
 
 #define EXPLOSION_DELAY 255
 #define HUE_BEGIN 25
 byte phaseOffset[6] = {0, (EXPLOSION_DELAY / 5) * 2, (EXPLOSION_DELAY / 5) * 5, (EXPLOSION_DELAY / 5) * 3, (EXPLOSION_DELAY / 5) * 1, (EXPLOSION_DELAY / 5) * 4};
 
-#define LASER_FULL_DURATION 4750
+#define LASER_FULL_DURATION    LASER_BLAST_DURATION + LASER_FADE + EXPLOSION_DURATION + WORLD_FADE_IN // 3350ms
 bool laserFaces[6] = {false, false, false, false, false, false};
 
 // SYNCHRONIZED WAVES
@@ -136,6 +140,7 @@ void inertLoop(byte face) {
   if (!isValueReceivedOnFaceExpired(face)) {//neighbor!
     switch (getFaceSignal(getLastValueReceivedOnFace(face))) {
       case DAMAGE:
+        entryFace = face; // save this for explosion animation
         passDamage(face);
         takeDamage();
         //trigger animation
@@ -285,9 +290,9 @@ void takeDamage() {
 }
 
 void getHealed() {
-  
+
   healingTimer.set(HEAL_TIME);
-  
+
   //update health total
   updateHealthTotal();
 
@@ -418,41 +423,88 @@ void shipDisplay() {
       setColorOnFace(GREEN, 5);
     }
   } else {//laser display
-    if (LASER_FULL_DURATION - laserTimer.getRemaining() < LASER_BLAST_DURATION) {//laser full display
+
+    long laserProgress = LASER_FULL_DURATION - laserTimer.getRemaining();
+
+    if (laserProgress < LASER_BLAST_DURATION) {//laser full display
 
 
       FOREACH_FACE(f) {
         if (laserFaces[f] == true) {//I'm in the laser path, just gonna be red this whole time
           setColorOnFace(RED, f);
         } else {//I'm a laser edge, I will fade to nothing immediately
-          if (LASER_FULL_DURATION - laserTimer.getRemaining() < LASER_FADE) {//are we in the fade period?
-            byte fade = 255 - map(LASER_FULL_DURATION - laserTimer.getRemaining(), 0, LASER_FADE, 0, 255);
+          if (laserProgress < LASER_FADE) {//are we in the fade period?
+            byte fade = 255 - map(laserProgress, 0, LASER_FADE, 0, 255);
             setColorOnFace(dim(RED, fade), f);
           } else {//we're already off
             setColorOnFace(OFF, f);
           }
         }
       }
-    } else if (LASER_FULL_DURATION - laserTimer.getRemaining() > LASER_BLAST_DURATION && LASER_FULL_DURATION - laserTimer.getRemaining() < LASER_BLAST_DURATION + LASER_FADE) {
-      //laser fade down
-      FOREACH_FACE(f) {
-        if (laserFaces[f] == true) {
-          byte laserBrightness = 255 - map(LASER_FULL_DURATION - laserTimer.getRemaining() - LASER_BLAST_DURATION, 0, LASER_FADE, 0, 255);
-          setColorOnFace(makeColorHSB(0, 255, laserBrightness), f);
-        } else {
-          setColorOnFace(OFF, f);
-        }
-      }
-    } else if (laserTimer.getRemaining() < EXPLOSION_DURATION + WORLD_FADE_IN && laserTimer.getRemaining() > WORLD_FADE_IN) {
+      segment = 0;
+    } else if (laserProgress >= LASER_BLAST_DURATION && laserProgress < LASER_BLAST_DURATION + LASER_FADE) {
+//      //laser fade down
+//      FOREACH_FACE(f) {
+//        if (laserFaces[f] == true) {
+//          byte laserBrightness = 255 - map(laserProgress - LASER_BLAST_DURATION, 0, LASER_FADE, 0, 255);
+//          setColorOnFace(makeColorHSB(0, 255, laserBrightness), f);
+//        } else {
+//          setColorOnFace(OFF, f);
+//        }
+//      }
+//      
+//      segment = 0;
+      
+    } else if (laserProgress >= LASER_BLAST_DURATION + LASER_FADE && laserProgress < LASER_BLAST_DURATION + LASER_FADE + EXPLOSION_DURATION ) {
 
       //explosion time!
-      byte currentHue = map(laserTimer.getRemaining(), WORLD_FADE_IN, EXPLOSION_DURATION + WORLD_FADE_IN, 0, HUE_BEGIN);
-      FOREACH_FACE(f) {//do explosions on each face with phase offsets
-        if (laserTimer.getRemaining() < EXPLOSION_DURATION + WORLD_FADE_IN - phaseOffset[f]) { //should this face be exploding?
-          byte progress = map(laserTimer.getRemaining(), WORLD_FADE_IN, EXPLOSION_DURATION + WORLD_FADE_IN - phaseOffset[f], 0, 255); //255-0 as the explosion carries on
-          setColorOnFace(makeColorHSB(currentHue, 255 - progress, progress), f);
+      setColor(OFF);  // set a dark backdrop
+      if (!attackAniTimer.isExpired()) {
+        if (segment < 5 ) {
+          long progress = attackAniTimer.getRemaining();
+          byte sat = 255 - map(progress, 3*EXPLOSION_DURATION/16, EXPLOSION_DURATION/4, 0 , 255); 
+          byte brightness;
+          if(progress > 3*EXPLOSION_DURATION/16)
+            brightness = 255;
+          else
+            brightness = map(progress, 0, 3*EXPLOSION_DURATION/16, 0, 255);
+          switch (segment) {
+            case 1:
+              setColorOnFace(makeColorHSB(20,sat,brightness), (entryFace + 0)%FACE_COUNT);
+              setColorOnFace(RED, (entryFace + 3)%FACE_COUNT);
+              break;
+            case 2:
+              setColorOnFace(makeColorHSB(20,sat,brightness), (entryFace + 1)%FACE_COUNT);
+              setColorOnFace(makeColorHSB(20,sat,brightness), (entryFace + 5)%FACE_COUNT);
+              setColorOnFace(RED, (entryFace + 3)%FACE_COUNT);
+              break;
+            case 3:
+              setColorOnFace(makeColorHSB(20,sat,brightness), (entryFace + 2)%FACE_COUNT);
+              setColorOnFace(makeColorHSB(20,sat,brightness), (entryFace + 4)%FACE_COUNT);
+              setColorOnFace(RED, (entryFace + 3)%FACE_COUNT);
+              break;
+            case 4:
+              setColorOnFace(makeColorHSB(20,sat,brightness), (entryFace + 3)%FACE_COUNT);
+              break;
+            default:
+              setColor(OFF);
+              break;
+          }
         }
       }
+      else {
+        if(segment == 0) setColorOnFace(RED, entryFace);
+        setColorOnFace(RED, (entryFace + 3)%FACE_COUNT);
+        segment++;
+        attackAniTimer.set(EXPLOSION_DURATION/4);
+      }
+      //      byte currentHue = map(laserTimer.getRemaining(), WORLD_FADE_IN, EXPLOSION_DURATION + WORLD_FADE_IN, 0, HUE_BEGIN);
+      //      FOREACH_FACE(f) {//do explosions on each face with phase offsets
+      //        if (laserTimer.getRemaining() < EXPLOSION_DURATION + WORLD_FADE_IN - phaseOffset[f]) { //should this face be exploding?
+      //          byte progress = map(laserTimer.getRemaining(), WORLD_FADE_IN, EXPLOSION_DURATION + WORLD_FADE_IN - phaseOffset[f], 0, 255); //255-0 as the explosion carries on
+      //          setColorOnFace(makeColorHSB(currentHue, 255 - progress, progress), f);
+      //        }
+      //      }
     } else { //world fade up
       byte fadeupBrightness = 255 - map(laserTimer.getRemaining(), 0, WORLD_FADE_IN, 0, 255);
       for (byte i = 0; i < 5; i++) {
