@@ -12,17 +12,17 @@ Timer healingTimer;
 #define HEAL_TIME 1000
 
 Timer laserTimer;//used when a laser blast has been recieved
-#define LASER_BLAST_DURATION 250//how long the big beam stays fully lit
+#define LASER_BLAST_DURATION 200//how long the big beam stays fully lit
 #define FLASH_FADE 200
 #define LASER_FADE 1500
-#define EXPLOSION_DURATION 2000
+#define EXPLOSION_DURATION 1500
 #define WORLD_FADE_IN 1000
 
 #define EXPLOSION_DELAY 255
 #define HUE_BEGIN 25
 byte phaseOffset[6] = {0, (EXPLOSION_DELAY / 5) * 2, (EXPLOSION_DELAY / 5) * 5, (EXPLOSION_DELAY / 5) * 3, (EXPLOSION_DELAY / 5) * 1, (EXPLOSION_DELAY / 5) * 4};
 
-#define LASER_FULL_DURATION 4750
+#define LASER_FULL_DURATION 4200
 bool laserFaces[6] = {false, false, false, false, false, false};
 
 // SYNCHRONIZED WAVES
