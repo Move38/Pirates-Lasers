@@ -12,8 +12,9 @@ Timer healingTimer;
 #define HEAL_TIME 1000
 
 Timer laserTimer;//used when a laser blast has been recieved
-#define LASER_BLAST_DURATION 1500//how long the big beam stays fully lit
-#define LASER_FADE 250
+#define LASER_BLAST_DURATION 250//how long the big beam stays fully lit
+#define FLASH_FADE 200
+#define LASER_FADE 1500
 #define EXPLOSION_DURATION 2000
 #define WORLD_FADE_IN 1000
 
@@ -425,8 +426,8 @@ void shipDisplay() {
         if (laserFaces[f] == true) {//I'm in the laser path, just gonna be red this whole time
           setColorOnFace(RED, f);
         } else {//I'm a laser edge, I will fade to nothing immediately
-          if (LASER_FULL_DURATION - laserTimer.getRemaining() < LASER_FADE) {//are we in the fade period?
-            byte fade = 255 - map(LASER_FULL_DURATION - laserTimer.getRemaining(), 0, LASER_FADE, 0, 255);
+          if (LASER_FULL_DURATION - laserTimer.getRemaining() < FLASH_FADE) {//are we in the fade period?
+            byte fade = 255 - map(LASER_FULL_DURATION - laserTimer.getRemaining(), 0, FLASH_FADE, 0, 255);
             setColorOnFace(dim(RED, fade), f);
           } else {//we're already off
             setColorOnFace(OFF, f);
