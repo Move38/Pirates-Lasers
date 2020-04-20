@@ -22,6 +22,8 @@ Timer laserTimer;//used when a laser blast has been recieved
 #define HUE_BEGIN 25
 byte phaseOffset[6] = {0, (EXPLOSION_DELAY / 5) * 2, (EXPLOSION_DELAY / 5) * 5, (EXPLOSION_DELAY / 5) * 3, (EXPLOSION_DELAY / 5) * 1, (EXPLOSION_DELAY / 5) * 4};
 
+byte worldFadeGlobal = 255;
+
 #define LASER_FULL_DURATION 4200
 bool laserFaces[6] = {false, false, false, false, false, false};
 
@@ -65,6 +67,7 @@ void loop() {
         orientation = (orientation + 1) % 6;
         //TRIGGER ANIMATION
         laserTimer.set(LASER_FULL_DURATION);
+        worldFadeGlobal = 0;
         break;
       case SHIP:
         //SEND HEALING PULSE!
@@ -141,6 +144,7 @@ void inertLoop(byte face) {
         takeDamage();
         //trigger animation
         laserTimer.set(LASER_FULL_DURATION);
+        worldFadeGlobal = 0;
         break;
       case HEAL:
         faceSignal[face] = HEAL;
@@ -286,9 +290,9 @@ void takeDamage() {
 }
 
 void getHealed() {
-  
+
   healingTimer.set(HEAL_TIME);
-  
+
   //update health total
   updateHealthTotal();
 
@@ -397,8 +401,10 @@ void waterDisplay() { //just displays the water beneath any piece with missing b
   byte syncProgressSin = sin8_C(syncProgress);
   byte syncProgressMapped = map(syncProgressSin, 0, 255, WATER_MIN_BRIGHTNESS, WATER_MAX_BRIGHTNESS);
 
-  //byte syncProgressMapped = map(syncTimer.getRemaining(), 0, PERIOD_DURATION, 0, 255);
-  setColor(makeColorHSB(WATER_HUE, 255, syncProgressMapped));
+  //now I have to make sure we're fading in appropriately during world fade events
+  byte finalBrightness = (syncProgressMapped * worldFadeGlobal) / 255;
+
+  setColor(makeColorHSB(WATER_HUE, 255, finalBrightness));
 }
 
 void shipDisplay() {
@@ -462,6 +468,9 @@ void shipDisplay() {
         }
       }
 
+      //set the fade in variable for the wave display
+      worldFadeGlobal = fadeupBrightness;
+
       if (healthTotal > 0) {
         setColorOnFace(dim(GREEN, fadeupBrightness), 5);
       }
@@ -477,6 +486,10 @@ void laserDisplay() {
     //we are in that little laser fading time, so we should do the same
     byte laserBrightness = 255 - map(LASER_FULL_DURATION - laserTimer.getRemaining() - LASER_BLAST_DURATION, 0, LASER_FADE, 0, 255);
     setColor(makeColorHSB(0, 255, laserBrightness));
+  } else if (!laserTimer.isExpired() && laserTimer.getRemaining() < EXPLOSION_DURATION + WORLD_FADE_IN && laserTimer.getRemaining() > WORLD_FADE_IN) {
+    setColor(OFF);
+  } else if (!laserTimer.isExpired()) { //world fade up
+    worldFadeGlobal = 255 - map(laserTimer.getRemaining(), 0, WORLD_FADE_IN, 0, 255);
   }
 
   setColorOnFace(RED, orientation);
