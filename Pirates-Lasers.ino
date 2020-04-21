@@ -27,6 +27,8 @@ byte worldFadeGlobal = 255;
 #define LASER_FULL_DURATION 4200
 bool laserFaces[6] = {false, false, false, false, false, false};
 
+bool isValid = true;
+
 // SYNCHRONIZED WAVES
 Timer syncTimer;
 #define PERIOD_DURATION 6000
@@ -41,6 +43,9 @@ void setup() {
 }
 
 void loop() {
+
+  //check for valid setup
+  validateSetup();
 
   //listen for inputs
   if (buttonMultiClicked()) {//reset all health
@@ -131,6 +136,34 @@ void loop() {
     case MIRROR:
       mirrorDisplay();
       break;
+  }
+}
+
+void validateSetup() {
+  //determine if I am in an invalid setup
+  bool hasHullNeighbor = false;
+  FOREACH_FACE(f) {
+    if (!isValueReceivedOnFaceExpired(f)) {//a neighbor!
+
+      //get neighbor mode
+      if (getBlinkMode(getLastValueReceivedOnFace(f)) == SHIP) {
+        hasHullNeighbor = true;
+      }
+
+      //make sure neighbors are in clusters
+      byte rightNeighbor = (f + 1) % 6;
+      byte leftNeighbor = (f + 5) % 6;
+      if (isValueReceivedOnFaceExpired(rightNeighbor) && isValueReceivedOnFaceExpired(rightNeighbor)) {//this neighbor has no NEIGHBORING neighbors, so... bad
+        isValid = true;
+      } else {
+        isValid = false;
+      }
+    }
+  }
+
+  //so if we made it out of here as true, we just want to check that if we're not a hull piece, we have a hull neighbor
+  if (isValid && blinkMode == SHIP && !hasHullNeighbor) {
+    isValid = false;
   }
 }
 
