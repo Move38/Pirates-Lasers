@@ -60,8 +60,7 @@ void loop() {
     }
   }
 
-  if (buttonSingleClicked()) {
-    //if it's a laser, FIRE
+  if (buttonSingleClicked() && isValid) {
     switch (blinkMode) {
       case LASER:
         //FIRE ALL LASER FACES
@@ -73,6 +72,10 @@ void loop() {
         //TRIGGER ANIMATION
         laserTimer.set(LASER_FULL_DURATION);
         worldFadeGlobal = 0;
+        break;
+      case MIRROR:
+        //just tick orientation
+        orientation = (orientation + 1) % 6;
         break;
       case SHIP:
         //SEND HEALING PULSE!
@@ -137,32 +140,45 @@ void loop() {
       mirrorDisplay();
       break;
   }
+
+  if (!isValid) {
+    invalidDisplay();
+  }
 }
 
 void validateSetup() {
+
+  //default to valid
+  isValid = true;
+
   //determine if I am in an invalid setup
+  bool foundBadNeighbor = false;
   bool hasHullNeighbor = false;
   FOREACH_FACE(f) {
     if (!isValueReceivedOnFaceExpired(f)) {//a neighbor!
+
+      //make sure neighbors are in clusters
+      byte rightNeighbor = (f + 1) % 6;
+      byte leftNeighbor = (f + 5) % 6;
+      if (isValueReceivedOnFaceExpired(rightNeighbor) && isValueReceivedOnFaceExpired(leftNeighbor)) {//this neighbor has no NEIGHBORING neighbors, so... bad
+        foundBadNeighbor = true;
+      }
 
       //get neighbor mode
       if (getBlinkMode(getLastValueReceivedOnFace(f)) == SHIP) {
         hasHullNeighbor = true;
       }
 
-      //make sure neighbors are in clusters
-      byte rightNeighbor = (f + 1) % 6;
-      byte leftNeighbor = (f + 5) % 6;
-      if (isValueReceivedOnFaceExpired(rightNeighbor) && isValueReceivedOnFaceExpired(rightNeighbor)) {//this neighbor has no NEIGHBORING neighbors, so... bad
-        isValid = true;
-      } else {
-        isValid = false;
-      }
     }
   }
 
+  //now let's deal with the outcome of our search
+  if (foundBadNeighbor || isAlone()) {
+    isValid = false;
+  }
+
   //so if we made it out of here as true, we just want to check that if we're not a hull piece, we have a hull neighbor
-  if (isValid && blinkMode == SHIP && !hasHullNeighbor) {
+  if (isValid && blinkMode != SHIP && !hasHullNeighbor) {
     isValid = false;
   }
 }
@@ -287,6 +303,10 @@ void passDamage(byte face) {
       laserFaces[face] = true;
       laserFaces[(face + 3) % 6] = true;
     }
+
+    //now change the orientation
+    orientation = (orientation + 1) % 6;
+
   } else {//just a regular ship piece or actual laser piece
     faceSignal[face] = DAMAGE;
     faceSignal[(face + 3) % 6] = DAMAGE;
@@ -438,6 +458,15 @@ void waterDisplay() { //just displays the water beneath any piece with missing b
   byte finalBrightness = (syncProgressMapped * worldFadeGlobal) / 255;
 
   setColor(makeColorHSB(WATER_HUE, 255, finalBrightness));
+}
+
+void invalidDisplay() {
+  //determine where we are in the sync process
+  //we break the sync period into 250 ms chunks, and then query where we are
+  byte animationPosition = (syncTimer.getRemaining() / 125) % 8;
+  if (animationPosition == 3 || animationPosition == 5 || animationPosition == 7 ) {
+    setColor(OFF);
+  }
 }
 
 void shipDisplay() {
