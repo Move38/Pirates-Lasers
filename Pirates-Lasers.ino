@@ -5,6 +5,10 @@ byte orientation = 0;//travels around from
 enum signals {INERT, HEAL, DAMAGE, RESET, RESOLVE};
 byte faceSignal[6] = {INERT, INERT, INERT, INERT, INERT, INERT};
 
+#define HULL_HUE 35
+#define HULL_SAT 200
+#define HULL_COLOR makeColorHSB(HULL_HUE, HULL_SAT, 255)
+
 enum healthStates {DAMAGED, HEALTHY, HEALING, TRANSFERRING};
 byte health[5] = {HEALTHY, HEALTHY, HEALTHY, HEALTHY, HEALTHY};
 byte healthTotal = 5;
@@ -473,10 +477,10 @@ void shipDisplay() {
   if (laserTimer.isExpired()) {//normal display
     for (byte i = 0; i < 5; i++) {
       if (health[i] == HEALTHY) {
-        setColorOnFace(YELLOW, i);
+        setColorOnFace(HULL_COLOR, i);
       } else if (health[i] == HEALING) {
-        byte healingBrightness = 255 - map(healingTimer.getRemaining(), 0, HEAL_TIME, 0, 255);
-        setColorOnFace(dim(WHITE, healingBrightness), i);
+        byte healingSaturation = HULL_SAT - map(healingTimer.getRemaining(), 0, HEAL_TIME, 0, HULL_SAT);
+        setColorOnFace(makeColorHSB(HULL_HUE, healingSaturation, 255), i);
       } else if (health[i] == TRANSFERRING) {
         byte transferBrightness = map(healingTimer.getRemaining(), 0, HEAL_TIME, 0, 255);
         setColorOnFace(dim(WHITE, transferBrightness), i);
@@ -484,7 +488,7 @@ void shipDisplay() {
     }
 
     if (healthTotal > 0) {
-      setColorOnFace(GREEN, 5);
+      setColorOnFace(WHITE, 5);
     }
   } else {//laser display
     if (LASER_FULL_DURATION - laserTimer.getRemaining() < LASER_BLAST_DURATION) {//laser full display
@@ -526,7 +530,7 @@ void shipDisplay() {
       byte fadeupBrightness = 255 - map(laserTimer.getRemaining(), 0, WORLD_FADE_IN, 0, 255);
       for (byte i = 0; i < 5; i++) {
         if (health[i] == HEALTHY) {
-          setColorOnFace(dim(YELLOW, fadeupBrightness), i);
+          setColorOnFace(dim(HULL_COLOR, fadeupBrightness), i);
         }
       }
 
@@ -534,7 +538,7 @@ void shipDisplay() {
       worldFadeGlobal = fadeupBrightness;
 
       if (healthTotal > 0) {
-        setColorOnFace(dim(GREEN, fadeupBrightness), 5);
+        setColorOnFace(dim(WHITE, fadeupBrightness), 5);
       }
     }
   }
