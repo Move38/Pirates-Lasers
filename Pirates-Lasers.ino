@@ -138,10 +138,8 @@ void loop() {
       shipDisplay();
       break;
     case LASER:
-      laserDisplay();
-      break;
     case MIRROR:
-      mirrorDisplay();
+      laserDisplay();
       break;
   }
 
@@ -556,14 +554,20 @@ void laserDisplay() {
     setColor(OFF);
   } else if (!laserTimer.isExpired()) { //world fade up
     worldFadeGlobal = 255 - map(laserTimer.getRemaining(), 0, WORLD_FADE_IN, 0, 255);
+    if (blinkMode == MIRROR) {
+      setColorOnFace(makeColorHSB(0, 0, worldFadeGlobal), orientation);
+      setColorOnFace(makeColorHSB(0, 0, worldFadeGlobal), (orientation + 2) % 6);
+    }
   }
 
-  setColorOnFace(RED, orientation);
-  setColorOnFace(RED, (orientation + 2) % 6);
-  setColorOnFace(RED, (orientation + 4) % 6);
-}
-
-void mirrorDisplay() {
-  setColorOnFace(WHITE, orientation);
-  setColorOnFace(WHITE, (orientation + 2) % 6);
+  if (blinkMode == LASER) {
+    setColorOnFace(RED, orientation);
+    setColorOnFace(RED, (orientation + 2) % 6);
+    setColorOnFace(RED, (orientation + 4) % 6);
+  } else {
+    if (laserTimer.isExpired()) {
+      setColorOnFace(WHITE, orientation);
+      setColorOnFace(WHITE, (orientation + 2) % 6);
+    }
+  }
 }
