@@ -8,6 +8,7 @@ byte faceSignal[6] = {INERT, INERT, INERT, INERT, INERT, INERT};
 #define HULL_HUE 35
 #define HULL_SAT 200
 #define HULL_COLOR makeColorHSB(HULL_HUE, HULL_SAT, 255)
+#define REFLECTOR_COLOR makeColorHSB(0, 130, 255)
 
 enum healthStates {DAMAGED, HEALTHY, HEALING, TRANSFERRING};
 byte health[5] = {HEALTHY, HEALTHY, HEALTHY, HEALTHY, HEALTHY};
@@ -551,12 +552,16 @@ void laserDisplay() {
     byte laserBrightness = 255 - map(LASER_FULL_DURATION - laserTimer.getRemaining() - LASER_BLAST_DURATION, 0, LASER_FADE, 0, 255);
     setColor(makeColorHSB(0, 255, laserBrightness));
   } else if (!laserTimer.isExpired() && laserTimer.getRemaining() < EXPLOSION_DURATION + WORLD_FADE_IN && laserTimer.getRemaining() > WORLD_FADE_IN) {
-    setColor(OFF);
+    if (blinkMode == LASER) {
+      setColor(OFF);
+    } else {//reflectors get the fun explosion
+      shipDisplay();
+    }
   } else if (!laserTimer.isExpired()) { //world fade up
     worldFadeGlobal = 255 - map(laserTimer.getRemaining(), 0, WORLD_FADE_IN, 0, 255);
     if (blinkMode == MIRROR) {
-      setColorOnFace(makeColorHSB(0, 0, worldFadeGlobal), orientation);
-      setColorOnFace(makeColorHSB(0, 0, worldFadeGlobal), (orientation + 2) % 6);
+      setColorOnFace(dim(REFLECTOR_COLOR, worldFadeGlobal), orientation);
+      setColorOnFace(dim(REFLECTOR_COLOR, worldFadeGlobal), (orientation + 2) % 6);
     }
   }
 
@@ -566,8 +571,8 @@ void laserDisplay() {
     setColorOnFace(RED, (orientation + 4) % 6);
   } else {
     if (laserTimer.isExpired()) {
-      setColorOnFace(WHITE, orientation);
-      setColorOnFace(WHITE, (orientation + 2) % 6);
+      setColorOnFace(REFLECTOR_COLOR, orientation);
+      setColorOnFace(REFLECTOR_COLOR, (orientation + 2) % 6);
     }
   }
 }
