@@ -41,8 +41,6 @@ Timer syncTimer;
 byte neighborState[6];
 byte syncVal = 0;
 
-bool enableValidationCheck = false;
-
 void setup() {
   // put your setup code here, to run once:
 
@@ -50,17 +48,8 @@ void setup() {
 
 void loop() {
 
-  if (buttonLongPressed()) {
-    // enable/disable isValid
-    enableValidationCheck = !enableValidationCheck;
-  }
-  // TODO: Create a visual to signal when validation check is turned on or off
-  // TODO: Propogate validation check on or off
-
   //check for valid setup
-  if (enableValidationCheck) {
-    validateSetup();
-  }
+  validateSetup();
 
   //listen for inputs
   if (buttonMultiClicked()) {//reset all health
@@ -75,7 +64,7 @@ void loop() {
     }
   }
 
-  if (buttonSingleClicked() ) { //&& isValid) {
+  if (buttonSingleClicked() && isValid) {
     switch (blinkMode) {
       case LASER:
         //FIRE ALL LASER FACES
@@ -154,10 +143,9 @@ void loop() {
       break;
   }
 
-  if (!isValid && enableValidationCheck) {
+  if (!isValid) {
     invalidDisplay();
   }
-
 }
 
 void validateSetup() {
