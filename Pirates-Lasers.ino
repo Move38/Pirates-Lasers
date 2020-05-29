@@ -5,10 +5,25 @@ byte orientation = 0;//travels around from
 enum signals {INERT, HEAL, DAMAGE, RESET, RESOLVE};
 byte faceSignal[6] = {INERT, INERT, INERT, INERT, INERT, INERT};
 
-#define HULL_HUE 35
-#define HULL_SAT 200
-#define HULL_COLOR makeColorHSB(HULL_HUE, HULL_SAT, 255)
+#define VALID_HUE 35
+#define VALID_SAT 200
+#define VALID_COLOR makeColorHSB(VALID_HUE, VALID_SAT, 255)
+
+#define INVALID_HUE 20
+#define INVALID_SAT 220
+#define INVALID_COLOR makeColorHSB(INVALID_HUE, INVALID_SAT, 255)
+
+#define VALID_WATER_HUE 150
+#define INVALID_WATER_HUE 110
+byte currentWaterHue = VALID_WATER_HUE;
+#define WATER_MIN_BRIGHTNESS 50
+#define WATER_MAX_BRIGHTNESS 150
+
 #define REFLECTOR_COLOR makeColorHSB(0, 130, 255)
+
+byte currentHullHue = VALID_HUE;
+byte currentHullSat = VALID_SAT;
+Color currentHullColor = VALID_COLOR;
 
 enum healthStates {DAMAGED, HEALTHY, HEALING, TRANSFERRING};
 byte health[5] = {HEALTHY, HEALTHY, HEALTHY, HEALTHY, HEALTHY};
@@ -143,16 +158,16 @@ void loop() {
       laserDisplay();
       break;
   }
-
-  if (!isValid) {
-    invalidDisplay();
-  }
 }
 
 void validateSetup() {
 
   //default to valid
   isValid = true;
+  currentHullHue = VALID_HUE;
+  currentHullSat = VALID_SAT;
+  currentHullColor = VALID_COLOR;
+  currentWaterHue = VALID_WATER_HUE;
 
   //determine if I am in an invalid setup
   bool foundBadNeighbor = false;
@@ -183,6 +198,13 @@ void validateSetup() {
   //so if we made it out of here as true, we just want to check that if we're not a hull piece, we have a hull neighbor
   if (isValid && blinkMode != SHIP && !hasHullNeighbor) {
     isValid = false;
+  }
+
+  if (isValid == false) {
+    currentHullHue = INVALID_HUE;
+    currentHullSat = INVALID_SAT;
+    currentHullColor = INVALID_COLOR;
+    currentWaterHue = INVALID_WATER_HUE;
   }
 }
 
@@ -447,10 +469,6 @@ void syncLoop() {
   }
 }
 
-#define WATER_HUE 150
-#define WATER_MIN_BRIGHTNESS 50
-#define WATER_MAX_BRIGHTNESS 150
-
 void waterDisplay() { //just displays the water beneath any piece with missing bits (lasers, mirrors, damaged ships)
 
   byte syncProgress = map(syncTimer.getRemaining(), 0, PERIOD_DURATION, 0, 255);
@@ -460,26 +478,17 @@ void waterDisplay() { //just displays the water beneath any piece with missing b
   //now I have to make sure we're fading in appropriately during world fade events
   byte finalBrightness = (syncProgressMapped * worldFadeGlobal) / 255;
 
-  setColor(makeColorHSB(WATER_HUE, 255, finalBrightness));
-}
-
-void invalidDisplay() {
-  //determine where we are in the sync process
-  //we break the sync period into 250 ms chunks, and then query where we are
-  byte animationPosition = (syncTimer.getRemaining() / 125) % 8;
-  if (animationPosition == 3 || animationPosition == 5 || animationPosition == 7 ) {
-    setColor(OFF);
-  }
+  setColor(makeColorHSB(currentWaterHue, 255, finalBrightness));
 }
 
 void shipDisplay() {
   if (laserTimer.isExpired()) {//normal display
     for (byte i = 0; i < 5; i++) {
       if (health[i] == HEALTHY) {
-        setColorOnFace(HULL_COLOR, i);
+        setColorOnFace(currentHullColor, i);
       } else if (health[i] == HEALING) {
-        byte healingSaturation = HULL_SAT - map(healingTimer.getRemaining(), 0, HEAL_TIME, 0, HULL_SAT);
-        setColorOnFace(makeColorHSB(HULL_HUE, healingSaturation, 255), i);
+        byte healingSaturation = currentHullSat - map(healingTimer.getRemaining(), 0, HEAL_TIME, 0, currentHullSat);
+        setColorOnFace(makeColorHSB(currentHullHue, healingSaturation, 255), i);
       } else if (health[i] == TRANSFERRING) {
         byte transferBrightness = map(healingTimer.getRemaining(), 0, HEAL_TIME, 0, 255);
         setColorOnFace(dim(WHITE, transferBrightness), i);
@@ -529,7 +538,7 @@ void shipDisplay() {
       byte fadeupBrightness = 255 - map(laserTimer.getRemaining(), 0, WORLD_FADE_IN, 0, 255);
       for (byte i = 0; i < 5; i++) {
         if (health[i] == HEALTHY) {
-          setColorOnFace(dim(HULL_COLOR, fadeupBrightness), i);
+          setColorOnFace(dim(currentHullColor, fadeupBrightness), i);
         }
       }
 
