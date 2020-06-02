@@ -13,9 +13,7 @@ byte faceSignal[6] = {INERT, INERT, INERT, INERT, INERT, INERT};
 #define INVALID_SAT 220
 #define INVALID_COLOR makeColorHSB(INVALID_HUE, INVALID_SAT, 255)
 
-#define VALID_WATER_HUE 150
-#define INVALID_WATER_HUE 110
-byte currentWaterHue = VALID_WATER_HUE;
+#define WATER_HUE 150
 #define WATER_MIN_BRIGHTNESS 50
 #define WATER_MAX_BRIGHTNESS 150
 
@@ -167,7 +165,6 @@ void validateSetup() {
   currentHullHue = VALID_HUE;
   currentHullSat = VALID_SAT;
   currentHullColor = VALID_COLOR;
-  currentWaterHue = VALID_WATER_HUE;
 
   //determine if I am in an invalid setup
   bool foundBadNeighbor = false;
@@ -204,7 +201,6 @@ void validateSetup() {
     currentHullHue = INVALID_HUE;
     currentHullSat = INVALID_SAT;
     currentHullColor = INVALID_COLOR;
-    currentWaterHue = INVALID_WATER_HUE;
   }
 }
 
@@ -478,14 +474,14 @@ void waterDisplay() { //just displays the water beneath any piece with missing b
     //now I have to make sure we're fading in appropriately during world fade events
     byte finalBrightness = (syncProgressMapped * worldFadeGlobal) / 255;
 
-    setColor(makeColorHSB(currentWaterHue, 255, finalBrightness));
+    setColor(makeColorHSB(WATER_HUE, 255, finalBrightness));
   } else {
     FOREACH_FACE(f) {
       int cycleOffset = (WHIRLPOOL_PERIOD / 6) * f;
       int cyclePosition = WHIRLPOOL_PERIOD - ((millis() + cycleOffset) % WHIRLPOOL_PERIOD);
       byte whirlpoolBrightess = map(cyclePosition, 0, WHIRLPOOL_PERIOD, WATER_MIN_BRIGHTNESS, WATER_MAX_BRIGHTNESS);
 
-      setColorOnFace(makeColorHSB(currentWaterHue, 255, whirlpoolBrightess), f);
+      setColorOnFace(makeColorHSB(WATER_HUE, 255, whirlpoolBrightess), f);
     }
   }
 }
