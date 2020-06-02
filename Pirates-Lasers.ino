@@ -80,7 +80,7 @@ void loop() {
     }
   }
 
-  if (buttonSingleClicked() && isValid) {
+  if (buttonSingleClicked()) {
     switch (blinkMode) {
       case LASER:
         //FIRE ALL LASER FACES
@@ -468,17 +468,26 @@ void syncLoop() {
     syncVal = !syncVal; // change our value everytime we pass go
   }
 }
-
+#define WHIRLPOOL_PERIOD 1000
 void waterDisplay() { //just displays the water beneath any piece with missing bits (lasers, mirrors, damaged ships)
+  if (isValid) {
+    byte syncProgress = map(syncTimer.getRemaining(), 0, PERIOD_DURATION, 0, 255);
+    byte syncProgressSin = sin8_C(syncProgress);
+    byte syncProgressMapped = map(syncProgressSin, 0, 255, WATER_MIN_BRIGHTNESS, WATER_MAX_BRIGHTNESS);
 
-  byte syncProgress = map(syncTimer.getRemaining(), 0, PERIOD_DURATION, 0, 255);
-  byte syncProgressSin = sin8_C(syncProgress);
-  byte syncProgressMapped = map(syncProgressSin, 0, 255, WATER_MIN_BRIGHTNESS, WATER_MAX_BRIGHTNESS);
+    //now I have to make sure we're fading in appropriately during world fade events
+    byte finalBrightness = (syncProgressMapped * worldFadeGlobal) / 255;
 
-  //now I have to make sure we're fading in appropriately during world fade events
-  byte finalBrightness = (syncProgressMapped * worldFadeGlobal) / 255;
+    setColor(makeColorHSB(currentWaterHue, 255, finalBrightness));
+  } else {
+    FOREACH_FACE(f) {
+      int cycleOffset = (WHIRLPOOL_PERIOD / 6) * f;
+      int cyclePosition = WHIRLPOOL_PERIOD - ((millis() + cycleOffset) % WHIRLPOOL_PERIOD);
+      byte whirlpoolBrightess = map(cyclePosition, 0, WHIRLPOOL_PERIOD, WATER_MIN_BRIGHTNESS, WATER_MAX_BRIGHTNESS);
 
-  setColor(makeColorHSB(currentWaterHue, 255, finalBrightness));
+      setColorOnFace(makeColorHSB(currentWaterHue, 255, whirlpoolBrightess), f);
+    }
+  }
 }
 
 void shipDisplay() {
